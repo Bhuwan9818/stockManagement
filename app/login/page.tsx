@@ -171,7 +171,7 @@ export default function LoginPage() {
                   type="email" className="input" required
                   value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  placeholder="admin@stockflow.com"
+                  placeholder="user@gmail.com"
                   style={{ paddingLeft: '2.25rem' }}
                   autoComplete="email"
                   disabled={dbState === 'no_database'}
