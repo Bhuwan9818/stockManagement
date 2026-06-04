@@ -96,7 +96,7 @@ export default function Dashboard() {
       <div className="stats-grid">
         {[
           { num: data.total_products, lbl: 'Products', icon: Package, color: 'var(--accent)', bg: 'var(--accent-bg)' },
-          { num: data.total_platforms, lbl: 'Channels', icon: Store, color: 'var(--blue)', bg: 'rgba(59,130,246,.12)' },
+          { num: data.total_platforms, lbl: 'Platforms', icon: Store, color: 'var(--blue)', bg: 'rgba(59,130,246,.12)' },
           { num: data.today_out, lbl: 'Out Today', icon: TrendingDown, color: 'var(--red)', bg: 'rgba(239,68,68,.12)' },
           { num: data.month_out, lbl: 'Out This Month', icon: TrendingDown, color: 'var(--yellow)', bg: 'rgba(245,158,11,.12)' },
           { num: data.month_in, lbl: 'Restocked Month', icon: TrendingUp, color: 'var(--green)', bg: 'rgba(34,197,94,.12)' },

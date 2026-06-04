@@ -45,7 +45,7 @@ All movements go through one unified **Transactions** page. Stock always comes f
 | `/` | Dashboard — stats, recent activity, quick actions |
 | `/transactions` | Log all stock movements (sale, return, restock, gift, offline, adjust) |
 | `/products` | Manage products, set master stock & low-stock threshold |
-| `/platforms` | Manage channels (online/offline/other) |
+| `/platforms` | Manage Platforms (online/offline/other) |
 | `/reports` | Analytics + Excel export with date/platform/product filters |
 
 ---
@@ -116,7 +116,7 @@ stockflow/
 │   │   └── export/route.ts         # Excel download
 │   ├── transactions/page.tsx       # Main transaction log + add form
 │   ├── products/page.tsx           # Products & master stock
-│   ├── platforms/page.tsx          # Sales channels
+│   ├── platforms/page.tsx          # Sales Platforms
 │   ├── reports/page.tsx            # Reports & Excel export
 │   ├── globals.css
 │   ├── layout.tsx
@@ -134,9 +134,9 @@ stockflow/
 
 ---
 
-## Adding More Channels
+## Adding More Platforms
 
-Go to **Channels** page → Add Channel. Pick type:
+Go to **Platforms** page → Add Channel. Pick type:
 - **Online Platform** — appears in the Platform dropdown when logging sales/returns
 - **Offline / Physical** — for walk-in stores
 - **Other** — gifts, B2B, bulk orders

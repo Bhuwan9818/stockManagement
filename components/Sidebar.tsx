@@ -8,7 +8,7 @@ const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/transactions', label: 'Transactions', icon: ClipboardList },
   { href: '/products', label: 'Products & Stock', icon: Package },
-  { href: '/platforms', label: 'Channels', icon: Store },
+  { href: '/platforms', label: 'Platforms', icon: Store },
   { href: '/reports', label: 'Reports & Export', icon: BarChart3 },
 ];
 

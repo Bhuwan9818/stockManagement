@@ -41,8 +41,8 @@ export default function PlatformsPage() {
     <div className="fade-up">
       <div className="page-hdr">
         <div>
-          <div className="page-title">Sales Channels</div>
-          <div className="page-sub">Manage online platforms, offline stores, and other channels</div>
+          <div className="page-title">Sales Platforms</div>
+          <div className="page-sub">Manage online platforms, offline stores, and other Platforms</div>
         </div>
         <button className="btn btn-primary" onClick={openAdd}><Plus size={13} /> Add Channel</button>
       </div>

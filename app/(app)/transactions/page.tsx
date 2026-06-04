@@ -124,7 +124,7 @@ function TransactionsInner() {
         <input type="date" className="input" style={{ width: 145 }} value={filters.start} onChange={e => setFilters(f => ({...f, start: e.target.value}))} placeholder="From" />
         <input type="date" className="input" style={{ width: 145 }} value={filters.end} onChange={e => setFilters(f => ({...f, end: e.target.value}))} placeholder="To" />
         <select className="input" style={{ width: 160 }} value={filters.platform_id} onChange={e => setFilters(f => ({...f, platform_id: e.target.value}))}>
-          <option value="">All Channels</option>
+          <option value="">All Platforms</option>
           {platforms.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <select className="input" style={{ width: 175 }} value={filters.product_id} onChange={e => setFilters(f => ({...f, product_id: e.target.value}))}>
