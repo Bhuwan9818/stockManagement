@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
 const PRODUCT_ORDER: string[] = [
   'EFW-25M','EFW-12M','EFW-50S','EFW-100S','EFW-HKG','EFW-1K-1111','EFW-1K-1115',
@@ -201,23 +201,106 @@ async function buildCompleteReportSheet(
     };
   }
 
-  // 5. Build worksheet
+  // ── 5. Build styled worksheet ────────────────────────────────────────────────
   const ws: XLSX.WorkSheet = {};
-  const setCell = (r: number, c: number, v: unknown) => {
-    ws[XLSX.utils.encode_cell({ r, c })] = {
+
+  // Helper: write a cell with value + style
+  const sc = (r: number, c: number, v: unknown, s?: Record<string, unknown>) => {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    ws[addr] = {
       v: v as XLSX.CellObject['v'],
       t: (typeof v === 'number' ? 'n' : 's') as XLSX.CellObject['t'],
+      ...(s ? { s } : {}),
     };
   };
 
-  // Period label for header
-  const periodLabel = startDate && endDate
-    ? `${startDate} to ${endDate}`
-    : startDate ? `From ${startDate}`
-    : endDate   ? `To ${endDate}`
-    : 'All Time';
+  // ── Colour palette ───────────────────────────────────────────────────────
+  const C = {
+    // Title banner
+    titleBg:    { rgb: '1E3A5F' },   // deep navy
+    titleFg:    { rgb: 'FFFFFF' },
+    // Sub-title / period row
+    subBg:      { rgb: '2E86AB' },   // steel blue
+    subFg:      { rgb: 'FFFFFF' },
+    // Column group header backgrounds
+    stockBg:    { rgb: '0D6E6E' },   // teal  — stock movement columns
+    platBg:     { rgb: '7B2D8B' },   // purple — platform sales columns
+    adjBg:      { rgb: 'B45309' },   // amber  — adjustments (gift/offline/cancel/return)
+    closingBg:  { rgb: '1E3A5F' },   // navy   — closing stock
+    headerFg:   { rgb: 'FFFFFF' },
+    // Totals row
+    totalsBg:   { rgb: 'F59E0B' },   // golden yellow
+    totalsFg:   { rgb: '1C1C1C' },
+    // Alternating data rows
+    rowEven:    { rgb: 'F0F7FF' },   // very light blue
+    rowOdd:     { rgb: 'FFFFFF' },
+    // Data text
+    dataFg:     { rgb: '1C1C1C' },
+    zeroFg:     { rgb: 'BBBBBB' },   // grey for zero values
+    productFg:  { rgb: '1E3A5F' },   // navy for product name
+  };
 
-  // Headers — Row 0
+  // ── Font / fill / border helpers ─────────────────────────────────────────
+  const bold    = (fg = C.dataFg) => ({ font: { bold: true,  color: fg, sz: 11 } });
+  const normal  = (fg = C.dataFg) => ({ font: { bold: false, color: fg, sz: 10 } });
+  const hdrCell = (bg: { rgb: string }) => ({
+    font:    { bold: true, color: C.headerFg, sz: 10 },
+    fill:    { patternType: 'solid', fgColor: bg },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: {
+      top:    { style: 'thin', color: { rgb: 'FFFFFF' } },
+      bottom: { style: 'thin', color: { rgb: 'FFFFFF' } },
+      left:   { style: 'thin', color: { rgb: 'FFFFFF' } },
+      right:  { style: 'thin', color: { rgb: 'FFFFFF' } },
+    },
+  });
+  const dataCell = (bg: { rgb: string }, fg = C.dataFg, isNum = false) => ({
+    font:    { bold: false, color: fg, sz: 10 },
+    fill:    { patternType: 'solid', fgColor: bg },
+    alignment: { horizontal: isNum ? 'center' : 'left', vertical: 'center' },
+    border: {
+      top:    { style: 'hair', color: { rgb: 'D0D7E5' } },
+      bottom: { style: 'hair', color: { rgb: 'D0D7E5' } },
+      left:   { style: 'hair', color: { rgb: 'D0D7E5' } },
+      right:  { style: 'hair', color: { rgb: 'D0D7E5' } },
+    },
+  });
+  const totalsCell = (isNum = false) => ({
+    font:    { bold: true, color: C.totalsFg, sz: 10 },
+    fill:    { patternType: 'solid', fgColor: C.totalsBg },
+    alignment: { horizontal: isNum ? 'center' : 'left', vertical: 'center' },
+    border: {
+      top:    { style: 'medium', color: { rgb: '92400E' } },
+      bottom: { style: 'medium', color: { rgb: '92400E' } },
+      left:   { style: 'thin',   color: { rgb: '92400E' } },
+      right:  { style: 'thin',   color: { rgb: '92400E' } },
+    },
+  });
+
+  // ── Period / month label ──────────────────────────────────────────────────
+  const fmtDate = (d: string) =>
+    new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  let monthTitle = 'All Time Report';
+  let periodLine = 'All transactions';
+  if (startDate && endDate) {
+    // Try to show a friendly month name if start→end spans one month
+    const s = new Date(startDate + 'T00:00:00');
+    const e = new Date(endDate   + 'T00:00:00');
+    const sameMonth = s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth();
+    monthTitle  = sameMonth
+      ? s.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) + ' — Stock Report'
+      : `Stock Report: ${fmtDate(startDate)} to ${fmtDate(endDate)}`;
+    periodLine  = `Period: ${fmtDate(startDate)}  →  ${fmtDate(endDate)}`;
+  } else if (startDate) {
+    monthTitle = `Stock Report from ${fmtDate(startDate)}`;
+    periodLine = `From ${fmtDate(startDate)}`;
+  } else if (endDate) {
+    monthTitle = `Stock Report up to ${fmtDate(endDate)}`;
+    periodLine = `Up to ${fmtDate(endDate)}`;
+  }
+
+  // ── Column definitions ────────────────────────────────────────────────────
   const headers = [
     'Product',
     'Prev Closing Stock',
@@ -230,20 +313,48 @@ async function buildCompleteReportSheet(
     'Return',
     'Closing Stock',
   ];
-  headers.forEach((h, c) => setCell(0, c, h));
+  const totalCols = headers.length;
 
-  // Numeric columns for totals (all except Product)
-  const numericColIndices = headers.slice(1).map((_, i) => i + 1);
+  // Which colour group each column falls into (by index)
+  const colGroup = (i: number): { rgb: string } => {
+    if (i === 0)                                        return C.stockBg;   // Product → teal (reused)
+    if (i <= 3)                                         return C.stockBg;   // stock movement cols
+    if (i <= 3 + allPlatformNames.length)               return C.platBg;    // platform cols
+    if (i <= 3 + allPlatformNames.length + 3)           return C.adjBg;     // gift/offline/cancel/return
+    return C.closingBg;                                                      // closing stock
+  };
 
-  // Totals row — row 1 (fill after data)
-  const totalsRowIdx = 1;
+  // ── Row 0: Title banner ───────────────────────────────────────────────────
+  const titleStyle = {
+    font:  { bold: true, color: C.titleFg, sz: 14 },
+    fill:  { patternType: 'solid', fgColor: C.titleBg },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  };
+  sc(0, 0, monthTitle, titleStyle);
+  for (let c = 1; c < totalCols; c++) sc(0, c, '', titleStyle); // fill merged area
+
+  // ── Row 1: Period subtitle ────────────────────────────────────────────────
+  const subStyle = {
+    font:  { bold: false, color: C.subFg, sz: 10, italic: true },
+    fill:  { patternType: 'solid', fgColor: C.subBg },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  };
+  sc(1, 0, periodLine, subStyle);
+  for (let c = 1; c < totalCols; c++) sc(1, c, '', subStyle);
+
+  // ── Row 2: Column headers ─────────────────────────────────────────────────
+  headers.forEach((h, c) => sc(2, c, h, hdrCell(colGroup(c))));
+
+  // ── Row 3: Totals (filled after data rows) ────────────────────────────────
+  const totalsRowIdx = 3;
   const colTotals: Record<number, number> = {};
   const addT = (c: number, v: number) => { colTotals[c] = (colTotals[c] ?? 0) + v; };
 
-  // Data rows start at row 2
-  let dataRow = 2;
+  // ── Data rows start at row 4 ──────────────────────────────────────────────
+  let dataRow = 4;
 
   for (const prod of sortedProducts) {
+    const rowBg = (dataRow % 2 === 0) ? C.rowEven : C.rowOdd;
     const pc    = prevClosing[prod.id] ?? 0;
     const rst   = restockMap[prod.id]  ?? 0;
     const misc  = miscMap[prod.id]     ?? { gift: 0, offline_sale: 0, cancel: 0, ret: 0 };
@@ -252,40 +363,87 @@ async function buildCompleteReportSheet(
     const platSales: number[] = allPlatformNames.map(pn => platSalesMap[pn]?.[prod.id] ?? 0);
     const totalPlatSales = platSales.reduce((s, v) => s + v, 0);
     const totalOut = totalPlatSales + misc.gift + misc.offline_sale + misc.cancel;
-    const closing = Math.max(0, total - totalOut + misc.ret);
+    const closing  = Math.max(0, total - totalOut + misc.ret);
 
-    let c = 0;
-    setCell(dataRow, c++, prod.name);
-    setCell(dataRow, c, pc);   addT(c++, pc);
-    setCell(dataRow, c, rst);  addT(c++, rst);
-    setCell(dataRow, c, total);addT(c++, total);
+    // Product name cell — left-aligned, navy bold
+    sc(dataRow, 0, prod.name, {
+      font:  { bold: true, color: C.productFg, sz: 10 },
+      fill:  { patternType: 'solid', fgColor: rowBg },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: { bottom: { style: 'hair', color: { rgb: 'D0D7E5' } }, right: { style: 'thin', color: { rgb: 'D0D7E5' } } },
+    });
 
-    for (const qty of platSales) { setCell(dataRow, c, qty); addT(c++, qty); }
+    let c = 1;
+    const numCell = (val: number, colIdx: number) => {
+      const isZero = val === 0;
+      const fg = isZero ? C.zeroFg : C.dataFg;
+      sc(dataRow, colIdx, val, dataCell(rowBg, fg, true));
+      addT(colIdx, val);
+    };
 
-    setCell(dataRow, c, misc.gift);         addT(c++, misc.gift);
-    setCell(dataRow, c, misc.offline_sale); addT(c++, misc.offline_sale);
-    setCell(dataRow, c, misc.cancel);       addT(c++, misc.cancel);
-    setCell(dataRow, c, misc.ret);          addT(c++, misc.ret);
-    setCell(dataRow, c, closing);           addT(c++, closing);
+    numCell(pc,    c++);
+    numCell(rst,   c++);
+    // Total Stock — slightly emphasised
+    sc(dataRow, c, total, {
+      font:  { bold: true, color: total === 0 ? C.zeroFg : C.dataFg, sz: 10 },
+      fill:  { patternType: 'solid', fgColor: rowBg },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: { bottom: { style: 'hair', color: { rgb: 'D0D7E5' } }, left: { style: 'thin', color: { rgb: 'D0D7E5' } }, right: { style: 'thin', color: { rgb: 'D0D7E5' } } },
+    });
+    addT(c++, total);
+
+    for (const qty of platSales) numCell(qty, c++);
+    numCell(misc.gift,         c++);
+    numCell(misc.offline_sale, c++);
+    numCell(misc.cancel,       c++);
+    numCell(misc.ret,          c++);
+
+    // Closing Stock — bold navy background tint
+    sc(dataRow, c, closing, {
+      font:  { bold: true, color: closing === 0 ? C.zeroFg : { rgb: '1E3A5F' }, sz: 10 },
+      fill:  { patternType: 'solid', fgColor: rowBg },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: { bottom: { style: 'hair', color: { rgb: 'D0D7E5' } }, left: { style: 'medium', color: { rgb: 'B0BEC5' } } },
+    });
+    addT(c++, closing);
 
     dataRow++;
   }
 
-  // Fill totals row
-  setCell(totalsRowIdx, 0, 'TOTAL');
-  for (const [ci, total] of Object.entries(colTotals)) {
-    setCell(totalsRowIdx, Number(ci), total);
+  // ── Totals row ────────────────────────────────────────────────────────────
+  sc(totalsRowIdx, 0, 'GRAND TOTAL', totalsCell(false));
+  for (let c = 1; c < totalCols; c++) {
+    sc(totalsRowIdx, c, colTotals[c] ?? 0, totalsCell(true));
   }
 
-  // Worksheet range & column widths
+  // ── Worksheet metadata ────────────────────────────────────────────────────
   ws['!ref'] = XLSX.utils.encode_range({
     s: { r: 0, c: 0 },
-    e: { r: dataRow - 1, c: headers.length - 1 },
+    e: { r: dataRow - 1, c: totalCols - 1 },
   });
+
+  // Row heights
+  ws['!rows'] = [
+    { hpt: 32 }, // row 0: title
+    { hpt: 20 }, // row 1: period subtitle
+    { hpt: 40 }, // row 2: column headers (tall for wrapped text)
+    { hpt: 22 }, // row 3: totals
+    ...Array(dataRow - 4).fill({ hpt: 18 }),
+  ];
+
+  // Column widths
   ws['!cols'] = headers.map((h, i) => ({
-    wch: i === 0 ? 36 : Math.max(h.length + 2, 14),
+    wch: i === 0 ? 38 : Math.max(h.length + 2, 14),
   }));
-  ws['!freeze'] = { xSplit: 1, ySplit: 2 };
+
+  // Merge title and subtitle rows across all columns
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } }, // title
+    { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } }, // subtitle
+  ];
+
+  // Freeze: first column + first 3 rows (title, subtitle, headers)
+  ws['!freeze'] = { xSplit: 1, ySplit: 3 };
 
   XLSX.utils.book_append_sheet(wb, ws, 'Stock Report');
 }
