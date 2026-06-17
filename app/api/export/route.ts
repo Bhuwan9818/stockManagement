@@ -86,9 +86,10 @@ async function buildCompleteReportSheet(
   ) as { id: number; sku: string; name: string; master_stock: number }[];
   const sortedProducts = sortByProductOrder(products, 'sku');
 
-  // 2. ALL platforms — always show every platform even with 0 sales
+  // 2. Online platforms only — exclude 'offline' and 'other' types (Gift, Offline Sale)
+  //    because those already have their own dedicated columns in the report.
   const allPlatforms = await query(
-    `SELECT id, name FROM platforms ORDER BY name`
+    `SELECT id, name FROM platforms WHERE type = 'online' ORDER BY name`
   ) as { id: number; name: string }[];
   const allPlatformNames = allPlatforms.map(p => p.name);
 
